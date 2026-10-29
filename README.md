@@ -1,4 +1,4 @@
-#https://dhpythonlingproject.streamlit.app/
+https://dhpythonlingproject.streamlit.app/
 
 # Разбор русских предложений
 
