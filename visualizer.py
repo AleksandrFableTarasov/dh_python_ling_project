@@ -34,7 +34,8 @@ class Visualizer:
         return os.path.join(self.out_dir, name)
 
     # --- дерево зависимостей ---
-    def save_tree(self, sentence, sent_id):
+    def draw_tree(self, sentence):
+        """Рисует дерево и возвращает фигуру matplotlib (без сохранения)."""
         tokens = list(sentence)
 
         # Центры слов по оси x (1 единица = 1 дюйм)
@@ -86,12 +87,16 @@ class Visualizer:
                     fontsize=8, zorder=3,
                     bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none"))
 
+        return fig
+
+    def save_tree(self, sentence, sent_id):
         path = self._path(sent_id, sentence, "tree")
-        fig.savefig(path, dpi=130)
+        self.draw_tree(sentence).savefig(path, dpi=130)
         return path
 
     # --- диаграмма частей речи ---
-    def save_pos_chart(self, sentence, sent_id):
+    def draw_pos_chart(self, sentence):
+        """Рисует диаграмму и возвращает фигуру matplotlib (без сохранения)."""
         counts = Counter(t.pos for t in sentence)
         labels, values = zip(*counts.most_common())
 
@@ -105,9 +110,11 @@ class Visualizer:
         short = sentence.text if len(sentence.text) <= 50 else sentence.text[:50] + "…"
         ax.set_title(f"Части речи: {short}", fontsize=10)
         fig.tight_layout()
+        return fig
 
+    def save_pos_chart(self, sentence, sent_id):
         path = self._path(sent_id, sentence, "pos")
-        fig.savefig(path, dpi=130)
+        self.draw_pos_chart(sentence).savefig(path, dpi=130)
         return path
 
     def save_all(self, sentence, sent_id):

@@ -2,14 +2,18 @@
 
 Запуск:  python main.py
 Режимы: ввод с клавиатуры или разбор CSV-файла (например, выгрузки НКРЯ).
+Веб-версия: streamlit run app.py
 """
 
 import os
 
 from analyzer import SpacyAnalyzer
-from reader import CorpusReader
+from reader import READERS
 from storage import CsvStorage
 from visualizer import Visualizer
+
+# data лежит рядом со скриптами, откуда бы вы ни запускали программу
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 MENU = """
 Выберите режим:
@@ -33,6 +37,11 @@ def keyboard_mode(analyzer, storage, visualizer):
         if not text or text.lower() in ("выход", "exit", "quit"):
             return
 
+        existing_id = storage.find(text)
+        if existing_id is not None:
+            print(f"Предложение уже есть (id = {existing_id}).")
+            continue
+
         sentence, sent_id, paths = analyze_and_save(
             text, analyzer, storage, visualizer, with_visuals=True
         )
@@ -45,18 +54,37 @@ def keyboard_mode(analyzer, storage, visualizer):
             print(f"Картинка: {os.path.abspath(p)}")
 
 
+def choose_reader_class():
+    """Спрашивает формат файла; варианты берутся из реестра READERS."""
+    keys = list(READERS)
+    print("\nФормат файла:")
+    for number, key in enumerate(keys, 1):
+        print(f"  {number} — {READERS[key].title}")
+    answer = input("> ").strip()
+    if answer.isdigit() and 1 <= int(answer) <= len(keys):
+        return READERS[keys[int(answer) - 1]]
+    print("Нужно ввести номер формата из списка.")
+    return None
+
+
 def file_mode(analyzer, storage, visualizer):
+    reader_class = choose_reader_class()
+    if reader_class is None:
+        return
+
     path = input("\nПуть к CSV-файлу (Enter — назад): ").strip().strip("\"'")
     if not path:
         return
-    column = input("Колонка с предложениями [Full context]: ").strip() or "Full context"
+    options = {}
+    if reader_class.needs_column:
+        options["column"] = input("Название колонки с предложениями: ").strip()
     limit_raw = input("Сколько предложений разобрать? [Enter — все]: ").strip()
     limit = int(limit_raw) if limit_raw.isdigit() and int(limit_raw) > 0 else None
     answer = input("Сохранять картинки для каждого предложения? (д/н) [н]: ")
     with_visuals = answer.strip().lower() in ("д", "да", "y", "yes")
 
     try:
-        reader = CorpusReader(path, column, limit)
+        reader = reader_class(path, limit=limit, **options)
     except (OSError, ValueError) as error:
         print(f"Ошибка: {error}")
         return
@@ -66,12 +94,19 @@ def file_mode(analyzer, storage, visualizer):
         print("В файле не нашлось предложений.")
         return
 
+    skipped = 0
     for i, text in enumerate(reader, 1):
-        _, sent_id, _ = analyze_and_save(text, analyzer, storage, visualizer, with_visuals)
         short = text if len(text) <= 60 else text[:60] + "…"
+        existing_id = storage.find(text)
+        if existing_id is not None:
+            skipped += 1
+            print(f"[{i}/{total}] уже есть (id = {existing_id}): {short}")
+            continue
+        _, sent_id, _ = analyze_and_save(text, analyzer, storage, visualizer, with_visuals)
         print(f"[{i}/{total}] №{sent_id}: {short}")
 
-    print(f"\nГотово: разобрано {total} предложений.")
+    print(f"\nГотово: разобрано новых предложений — {total - skipped}, "
+          f"пропущено (уже были в файле) — {skipped}.")
     print(f"Результаты: {os.path.abspath(storage.path)}")
     if with_visuals:
         print(f"Картинки: {os.path.abspath(visualizer.out_dir)}")
@@ -80,8 +115,8 @@ def file_mode(analyzer, storage, visualizer):
 def main():
     print("Загрузка модели...")
     analyzer = SpacyAnalyzer()
-    storage = CsvStorage("data/results.csv")
-    visualizer = Visualizer("data/visuals")
+    storage = CsvStorage(os.path.join(DATA_DIR, "results.csv"))
+    visualizer = Visualizer(os.path.join(DATA_DIR, "visuals"))
 
     while True:
         print(MENU)

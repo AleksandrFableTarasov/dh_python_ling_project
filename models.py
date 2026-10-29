@@ -50,17 +50,23 @@ class Sentence:
         return f"Sentence({self.text!r}, {len(self)} токенов)"
 
     # --- вывод ---
+    COLUMNS = ("№", "Форма", "Лемма", "Часть речи", "Признаки", "Связь", "Голова")
+
     def _head_form(self, token):
         return "—" if token.head == 0 else self.tokens[token.head - 1].form
 
-    def to_table(self):
-        """Текстовая таблица разбора."""
-        header = ("№", "Форма", "Лемма", "Часть речи", "Признаки", "Связь", "Голова")
-        rows = [
-            (str(t.tok_id), t.form, t.lemma, t.pos, t.feats or "—",
-             t.deprel, self._head_form(t))
+    def to_rows(self):
+        """Разбор как список словарей (удобно для таблицы в веб-интерфейсе)."""
+        return [
+            dict(zip(self.COLUMNS, (t.tok_id, t.form, t.lemma, t.pos,
+                                    t.feats or "—", t.deprel, self._head_form(t))))
             for t in self.tokens
         ]
+
+    def to_table(self):
+        """Текстовая таблица разбора."""
+        header = self.COLUMNS
+        rows = [tuple(str(v) for v in row.values()) for row in self.to_rows()]
         widths = [max(len(r[i]) for r in [header] + rows) for i in range(len(header))]
 
         def line(row):
