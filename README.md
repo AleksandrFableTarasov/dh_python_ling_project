@@ -1,3 +1,5 @@
+#https://dhpythonlingproject.streamlit.app/
+
 # Разбор русских предложений
 
 Морфологический и синтаксический разбор русского текста (spaCy, модель `ru_core_news_sm`).
